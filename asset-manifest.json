@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/healthtrack-app1/static/css/main.e6c13ad2.css",
+    "main.js": "/healthtrack-app1/static/js/main.81ad1b8b.js",
+    "index.html": "/healthtrack-app1/index.html",
+    "main.e6c13ad2.css.map": "/healthtrack-app1/static/css/main.e6c13ad2.css.map",
+    "main.81ad1b8b.js.map": "/healthtrack-app1/static/js/main.81ad1b8b.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.e6c13ad2.css",
+    "static/js/main.81ad1b8b.js"
+  ]
+}
