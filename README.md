@@ -108,7 +108,7 @@ A comprehensive full-stack wellness tracking web application that helps users mo
    DB_USER=root
    DB_PASSWORD=
    DB_NAME=healthtrack_db
-   JWT_SECRET=healthtrack_secret_key_2024_csci426
+   JWT_SECRET=healthtrack_secret_key_2025_csci426
 ```
 
 5. **Start backend server:**
@@ -284,6 +284,6 @@ This project was created for educational purposes as part of CSCI426 course at t
 
 ---
 
-**© 2024 HealthTrack - CSCI426 Advanced Web Programming Project**
+**© 2025 HealthTrack - CSCI426 Advanced Web Programming Project**
 
 **Built with ❤️ using React, Node.js, Express & MySQL**
