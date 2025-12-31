@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
@@ -107,6 +109,19 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
+// Place this above your 404 handler, after pool is defined
+app.get('/api/db-test', async (req, res) => {
+  try {
+    // Simple query to test MySQL connection
+    const [rows] = await pool.query('SELECT 1 + 1 AS result');
+    res.status(200).json({ message: 'Database connected!', result: rows[0].result });
+  } catch (err) {
+    console.error('Database connection failed:', err);
+    res.status(500).json({ message: 'Database connection failed', error: err.message });
+  }
+});
+
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -196,7 +211,7 @@ app.use((req, res) => {
    START SERVER (Railway)
 =========================== */
 // Load env vars (local only, safe on Railway)
-require('dotenv').config();
+
 
 // Start Server
 const PORT = process.env.PORT || 5000;
