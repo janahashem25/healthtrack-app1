@@ -376,7 +376,9 @@ pool.query('SELECT 1')
     console.error('  Error:', err.message);
     console.error('  Code:', err.code);
   });
-
+app.get('/test', (req, res) => {
+  res.json({ message: 'SERVER OK FROM MOBILE' });
+});
 // Start Server
 const PORT = process.env.PORT || 5000;
 
