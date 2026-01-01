@@ -628,19 +628,15 @@ function App() {
           </div>
         </div>
       )}
-
-      <footer style={{ backgroundColor: '#1f2937', color: 'white', padding: '24px 0', marginTop: '48px' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 16px', textAlign: 'center' }}>
-<<<<<<< HEAD
-          <p>© 2025 HealthTrack - CSCI426 Advanced Web Programming Project</p>
-=======
-          <p>© 2024 HealthTrack - CSCI426 Advanced Web Programming Project</p>
->>>>>>> ab91a94 (initial commit)
-          <p style={{ fontSize: '14px', color: '#9ca3af', marginTop: '8px' }}>
-            Built with React, Node.js & MySQL
-          </p>
-        </div>
-      </footer>
+<footer style={{ backgroundColor: '#1f2937', color: 'white', padding: '24px 0', marginTop: '48px' }}>
+  <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 16px', textAlign: 'center' }}>
+    <p>©️ 2025 HealthTrack - CSCI426 Advanced Web Programming Project</p>
+    <p style={{ fontSize: '14px', color: '#9ca3af', marginTop: '8px' }}>
+      Built with React, Node.js & MySQL
+    </p>
+  </div>
+</footer>
+      
     </div>
   );
 }
