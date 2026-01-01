@@ -4,9 +4,9 @@ backend/node_modules/
 
 # Environment variables
 .env
+backend/.env
 
-
-# Build
+# Build / Production
 build/
 dist/
 
@@ -14,10 +14,16 @@ dist/
 *.log
 npm-debug.log*
 
-# OS
+# OS generated files
 .DS_Store
 Thumbs.db
 
-# Package locks (optional)
+# Package lock files (optional)
 package-lock.json
 backend/package-lock.json
+
+# VSCode settings (optional)
+.vscode/
+
+# Coverage reports (optional)
+coverage/

@@ -4,7 +4,11 @@
 A comprehensive full-stack wellness tracking web application that helps users monitor their daily activities, meals, and exercise routines. Developed for **CSCI426: Advanced Web Programming** - Phase 1 & 2.
 
 ## 👥 Team Members
+<<<<<<< HEAD
 - **Jana Hashem** - Student ID: [52310156]
+=======
+- **Reine rifai** - Student ID: [92230103]
+>>>>>>> ab91a94 (initial commit)
 
 ## ✨ Features
 
@@ -276,8 +280,13 @@ created_at (TIMESTAMP)
 - Mobile app version
 
 ## 📞 Contact
+<<<<<<< HEAD
 - **Email**: janahashem.25@gmail.com
 - **GitHub**: [@janahashem25](https://github.com/janahashem25)
+=======
+- **Email**: reinef143@icloud.com
+- **GitHub**: [renerifai](https://github.com/reinerifai/healthtrack)
+>>>>>>> ab91a94 (initial commit)
 
 ## 📄 License
 This project was created for educational purposes as part of CSCI426 course at the Department of Computer Science and Information Technology.

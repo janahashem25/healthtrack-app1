@@ -1,274 +1,241 @@
-const express = require('express');
-const mysql = require('mysql2/promise');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const cors = require('cors');
-require('dotenv').config();
+const express = require("express");
+const mysql = require("mysql2/promise");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const cors = require("cors");
 
 const app = express();
 
-// Middleware
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+/* ===================== MIDDLEWARE ===================== */
+app.use(
+cors({
+origin: "*",
+methods: ["GET", "POST", "PUT", "DELETE"],
+allowedHeaders: ["Content-Type", "Authorization"],
+})
+);
 app.use(express.json());
 
-// Database connection pool
+/* ===================== DATABASE ===================== */
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+host: process.env.DB_HOST,
+user: process.env.DB_USER,
+password: process.env.DB_PASSWORD,
+database: process.env.DB_NAME,
+port: Number(process.env.DB_PORT || 3306),
+waitForConnections: true,
+connectionLimit: 10,
 });
 
-// Authentication Middleware
-const authMiddleware = (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'Authentication required' });
+// Test DB connection
+pool
+.query("SELECT 1")
+.then(() => console.log("✅ Database connected"))
+.catch((err) => console.error("❌ Database connection failed:", err));
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId;
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: 'Invalid or expired token' });
-  }
+/* ===================== AUTH MIDDLEWARE ===================== */
+const authMiddleware = (req, res, next) => {
+try {
+const token = req.headers.authorization?.split(" ")[1];
+if (!token) return res.status(401).json({ message: "Authentication required" });
+
+const decoded = jwt.verify(token, process.env.JWT_SECRET);
+req.userId = decoded.userId;
+next();
+} catch (err) {
+return res.status(401).json({ message: "Invalid or expired token" });
+}
 };
 
-// Test Route
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'HealthTrack API is running',
-    version: '1.0.0',
-    endpoints: {
-      auth: '/api/auth (signup, login, me)',
-      activities: '/api/activities (CRUD operations)'
-    }
-  });
+/* ===================== ROOT + TEST ROUTES ===================== */
+app.get("/", (req, res) => {
+res.send("HealthTrack backend is running ✅");
 });
 
-// Signup
-app.post('/api/auth/signup', async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ message: 'All fields are required' });
-    if (password.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' });
-
-    const [existingUser] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    if (existingUser.length > 0) return res.status(400).json({ message: 'Email already registered' });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const [result] = await pool.query(
-      'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-      [name, email, hashedPassword]
-    );
-
-    const token = jwt.sign({ userId: result.insertId }, process.env.JWT_SECRET, { expiresIn: '7d' });
-
-    res.status(201).json({
-      message: 'User created successfully',
-      token,
-      user: { id: result.insertId, name, email }
-    });
-  } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({ message: 'Server error during signup' });
-  }
+app.get("/api", (req, res) => {
+res.json({
+message: "HealthTrack API is running",
+version: "1.0.0",
+});
 });
 
-// Login
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ message: 'Email and password are required' });
+/* ===================== AUTH ROUTES ===================== */
+app.post("/api/auth/signup", async (req, res) => {
+try {
+const { name, email, password } = req.body;
 
-    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    if (users.length === 0) return res.status(401).json({ message: 'Invalid email or password' });
+if (!name || !email || !password)
+return res.status(400).json({ message: "All fields are required" });
 
-    const user = users[0];
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) return res.status(401).json({ message: 'Invalid email or password' });
+if (password.length < 6)
+return res.status(400).json({ message: "Password must be at least 6 characters" });
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+const [exists] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
+if (exists.length)
+return res.status(400).json({ message: "Email already registered" });
 
-    res.json({ message: 'Login successful', token, user: { id: user.id, name: user.name, email: user.email } });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error during login' });
-  }
+const hashed = await bcrypt.hash(password, 10);
+
+const [result] = await pool.query(
+"INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+[name, email, hashed]
+);
+
+if (!process.env.JWT_SECRET)
+return res.status(500).json({ message: "JWT_SECRET is missing in environment variables" });
+
+const token = jwt.sign({ userId: result.insertId }, process.env.JWT_SECRET, {
+expiresIn: "7d",
 });
 
-// Get Current User
-app.get('/api/auth/me', authMiddleware, async (req, res) => {
-  try {
-    const [users] = await pool.query('SELECT id, name, email, created_at FROM users WHERE id = ?', [req.userId]);
-    if (users.length === 0) return res.status(404).json({ message: 'User not found' });
-
-    res.json({ user: users[0] });
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+res.status(201).json({
+message: "User created",
+token,
+user: {
+id: result.insertId,
+name,
+email,
+},
+});
+} catch (err) {
+console.error(err);
+res.status(500).json({ message: "Signup error" });
+}
 });
 
-// CREATE - Add new activity
-app.post('/api/activities', authMiddleware, async (req, res) => {
-  try {
-    const { type, name, duration, calories, date } = req.body;
-    if (!type || !name || !calories || !date) return res.status(400).json({ message: 'Required fields: type, name, calories, date' });
-    if (!['exercise', 'meal'].includes(type)) return res.status(400).json({ message: 'Type must be either "exercise" or "meal"' });
+app.post("/api/auth/login", async (req, res) => {
+try {
+const { email, password } = req.body;
 
-    const [result] = await pool.query(
-      'INSERT INTO activities (user_id, type, name, duration, calories, date) VALUES (?, ?, ?, ?, ?, ?)',
-      [req.userId, type, name, duration || 0, calories, date]
-    );
+if (!email || !password)
+return res.status(400).json({ message: "Email and password required" });
 
-    const [newActivity] = await pool.query('SELECT * FROM activities WHERE id = ?', [result.insertId]);
+const [users] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
 
-    res.status(201).json({ message: 'Activity created successfully', activity: newActivity[0] });
-  } catch (error) {
-    console.error('Create activity error:', error);
-    res.status(500).json({ message: 'Server error creating activity' });
-  }
+if (!users.length) return res.status(401).json({ message: "Invalid credentials" });
+
+const user = users[0];
+const valid = await bcrypt.compare(password, user.password);
+
+if (!valid) return res.status(401).json({ message: "Invalid credentials" });
+
+if (!process.env.JWT_SECRET)
+return res.status(500).json({ message: "JWT_SECRET is missing in environment variables" });
+
+const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+expiresIn: "7d",
 });
 
-// READ - Get all activities
-app.get('/api/activities', authMiddleware, async (req, res) => {
-  try {
-    const [activities] = await pool.query(
-      'SELECT * FROM activities WHERE user_id = ? ORDER BY date DESC, created_at DESC',
-      [req.userId]
-    );
-    res.json({ activities, count: activities.length });
-  } catch (error) {
-    console.error('Get activities error:', error);
-    res.status(500).json({ message: 'Server error fetching activities' });
-  }
+res.json({
+message: "Login successful",
+token,
+user: {
+id: user.id,
+name: user.name,
+email: user.email,
+},
+});
+} catch (err) {
+console.error(err);
+res.status(500).json({ message: "Login error" });
+}
 });
 
-// READ - Get single activity
-app.get('/api/activities/:id', authMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const [activities] = await pool.query('SELECT * FROM activities WHERE id = ? AND user_id = ?', [id, req.userId]);
-    if (activities.length === 0) return res.status(404).json({ message: 'Activity not found' });
+app.get("/api/auth/me", authMiddleware, async (req, res) => {
+try {
+const [users] = await pool.query(
+"SELECT id, name, email, created_at FROM users WHERE id = ?",
+[req.userId]
+);
 
-    res.json({ activity: activities[0] });
-  } catch (error) {
-    console.error('Get activity error:', error);
-    res.status(500).json({ message: 'Server error fetching activity' });
-  }
+if (!users.length) return res.status(404).json({ message: "User not found" });
+
+res.json({ user: users[0] });
+} catch (err) {
+console.error(err);
+res.status(500).json({ message: "Me route error" });
+}
 });
 
-// UPDATE - Update activity
-app.put('/api/activities/:id', authMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { type, name, duration, calories, date } = req.body;
+/* ===================== ACTIVITIES ===================== */
+app.post("/api/activities", authMiddleware, async (req, res) => {
+try {
+const { type, name, duration = 0, calories, date } = req.body;
 
-    const [existing] = await pool.query('SELECT * FROM activities WHERE id = ? AND user_id = ?', [id, req.userId]);
-    if (existing.length === 0) return res.status(404).json({ message: 'Activity not found' });
-    if (type && !['exercise', 'meal'].includes(type)) return res.status(400).json({ message: 'Type must be either "exercise" or "meal"' });
+if (!type || !name || !calories || !date)
+return res.status(400).json({ message: "Missing fields" });
 
-    await pool.query(
-      'UPDATE activities SET type = ?, name = ?, duration = ?, calories = ?, date = ? WHERE id = ?',
-      [
-        type || existing[0].type,
-        name || existing[0].name,
-        duration !== undefined ? duration : existing[0].duration,
-        calories || existing[0].calories,
-        date || existing[0].date,
-        id
-      ]
-    );
+if (!["exercise", "meal"].includes(type))
+return res.status(400).json({ message: "Invalid type" });
 
-    const [updated] = await pool.query('SELECT * FROM activities WHERE id = ?', [id]);
-    res.json({ message: 'Activity updated successfully', activity: updated[0] });
-  } catch (error) {
-    console.error('Update activity error:', error);
-    res.status(500).json({ message: 'Server error updating activity' });
-  }
+const [result] = await pool.query(
+"INSERT INTO activities (user_id, type, name, duration, calories, date) VALUES (?, ?, ?, ?, ?, ?)",
+[req.userId, type, name, duration, calories, date]
+);
+
+const [activity] = await pool.query("SELECT * FROM activities WHERE id = ?", [
+result.insertId,
+]);
+
+res.status(201).json({ activity: activity[0] });
+} catch (err) {
+console.error(err);
+res.status(500).json({ message: "Create activity error" });
+}
 });
 
-// DELETE - Delete activity
-app.delete('/api/activities/:id', authMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const [existing] = await pool.query('SELECT * FROM activities WHERE id = ? AND user_id = ?', [id, req.userId]);
-    if (existing.length === 0) return res.status(404).json({ message: 'Activity not found' });
-
-    await pool.query('DELETE FROM activities WHERE id = ?', [id]);
-    res.json({ message: 'Activity deleted successfully', deletedId: id });
-  } catch (error) {
-    console.error('Delete activity error:', error);
-    res.status(500).json({ message: 'Server error deleting activity' });
-  }
+app.get("/api/activities", authMiddleware, async (req, res) => {
+try {
+const [activities] = await pool.query(
+"SELECT * FROM activities WHERE user_id = ? ORDER BY date DESC",
+[req.userId]
+);
+res.json({ activities });
+} catch (err) {
+console.error(err);
+res.status(500).json({ message: "Fetch activities error" });
+}
 });
 
-// Get Statistics
-app.get('/api/activities/stats/summary', authMiddleware, async (req, res) => {
-  try {
-    const [stats] = await pool.query(
-      `SELECT 
-        COUNT(*) as total_activities,
-        SUM(calories) as total_calories,
-        SUM(CASE WHEN type = 'exercise' THEN duration ELSE 0 END) as total_exercise_time,
-        COUNT(CASE WHEN type = 'exercise' THEN 1 END) as total_exercises,
-        COUNT(CASE WHEN type = 'meal' THEN 1 END) as total_meals
-       FROM activities 
-       WHERE user_id = ?`,
-      [req.userId]
-    );
+app.delete("/api/activities/:id", authMiddleware, async (req, res) => {
+try {
+const { id } = req.params;
 
-    res.json({ 
-      statistics: {
-        total_activities: parseInt(stats[0].total_activities) || 0,
-        total_calories: parseInt(stats[0].total_calories) || 0,
-        total_exercise_time: parseInt(stats[0].total_exercise_time) || 0,
-        total_exercises: parseInt(stats[0].total_exercises) || 0,
-        total_meals: parseInt(stats[0].total_meals) || 0
-      }
-    });
-  } catch (error) {
-    console.error('Get statistics error:', error);
-    res.status(500).json({ message: 'Server error fetching statistics' });
-  }
+const [exists] = await pool.query(
+"SELECT id FROM activities WHERE id = ? AND user_id = ?",
+[id, req.userId]
+);
+
+if (!exists.length) return res.status(404).json({ message: "Activity not found" });
+
+await pool.query("DELETE FROM activities WHERE id = ?", [id]);
+res.json({ message: "Activity deleted" });
+} catch (err) {
+console.error(err);
+res.status(500).json({ message: "Delete activity error" });
+}
 });
 
-// Test database connection
-pool.query('SELECT 1')
-  .then(() => console.log('✅ Database connection: SUCCESS'))
-  .catch((err) => console.error('❌ Database connection: FAILED', err.message, err.code));
+app.get("/api/activities/stats/summary", authMiddleware, async (req, res) => {
+try {
+const [stats] = await pool.query(
+`SELECT
+COUNT(*) AS total_activities,
+SUM(calories) AS total_calories
+FROM activities
+WHERE user_id = ?`,
+[req.userId]
+);
 
-// Test route for mobile
-app.get('/test', (req, res) => res.json({ message: 'SERVER OK FROM MOBILE' }));
-
-// 404 Handler
-app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
-
-// Global Error Handler
-app.use((err, req, res, next) => {
-  console.error('Global error:', err);
-  res.status(500).json({ message: 'Something went wrong!', error: process.env.NODE_ENV === 'development' ? err.message : undefined });
+res.json({ statistics: stats[0] });
+} catch (err) {
+console.error(err);
+res.status(500).json({ message: "Stats error" });
+}
 });
 
-// Start Server
+/* ===================== SERVER ===================== */
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`
-  ==========================================
-  🚀 HealthTrack Backend Server
-  ==========================================
-  ✅ Server running on port ${PORT}
-  📍 API URL: http://localhost:${PORT}
-  📊 Database: ${process.env.DB_NAME}
-  ==========================================
-  `);
+app.listen(PORT, "0.0.0.0", () => {
+console.log(`🚀 Server running on port ${PORT}`);
 });
-
-server.on('close', () => console.log('Server is shutting down...'));
