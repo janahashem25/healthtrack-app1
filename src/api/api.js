@@ -1,5 +1,5 @@
-const API_URL = 'http://localhost:3001/api';
 
+const API_URL = 'https://healthtrack-backend.onrender.com/api';
 // Get token from localStorage
 const getToken = () => localStorage.getItem('token');
 
