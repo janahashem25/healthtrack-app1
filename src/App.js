@@ -11,19 +11,11 @@ function App() {
   const [submitted, setSubmitted] = useState(false);
   const [user, setUser] = useState(null);
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
-  const [authMode, setAuthMode] = useState('login');
+  const [authMode, setAuthMode] = useState('signup');
   const [authError, setAuthError] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ total_activities: 0, total_calories: 0, total_exercise_time: 0 });
 
-  useEffect(() => {
-    const currentUser = api.getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-      loadActivities();
-      loadStatistics();
-    }
-  }, []);
 
   const loadActivities = async () => {
     try {
@@ -44,33 +36,34 @@ function App() {
   };
 
   const handleAuth = async (e) => {
-    e.preventDefault();
-    setAuthError('');
-    setLoading(true);
+  e.preventDefault();
+  setAuthError('');
+  setLoading(true);
 
-    try {
-      let result;
-      if (authMode === 'signup') {
-        result = await api.signup(authForm.name, authForm.email, authForm.password);
-      } else {
-        result = await api.login(authForm.email, authForm.password);
-      }
-
-      if (result.user) {
-        setUser(result.user);
-        setAuthForm({ name: '', email: '', password: '' });
-        setCurrentPage('home');
-        loadActivities();
-        loadStatistics();
-      } else {
-        setAuthError(result.message || 'Authentication failed');
-      }
-    } catch (error) {
-      setAuthError('Server error. Please try again.');
-    } finally {
-      setLoading(false);
+  try {
+    let result;
+    if (authMode === 'signup') {
+      result = await api.signup(authForm.name, authForm.email, authForm.password);
+    } else {
+      result = await api.login(authForm.email, authForm.password);
     }
-  };
+
+    if (result.user) {
+      setUser(result.user);
+      setAuthForm({ name: '', email: '', password: '' });
+      setCurrentPage('home');
+      await loadActivities();
+      await loadStatistics();
+    } else {
+      setAuthError(result.error || result.message || 'Authentication failed');
+    }
+  } catch (error) {
+    console.error('Auth error:', error);
+    setAuthError('Server error. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleLogout = () => {
     api.logout();
@@ -140,6 +133,23 @@ function App() {
           )}
 
           <div style={{ display: 'flex', marginBottom: '24px', borderBottom: '2px solid #e5e7eb' }}>
+              <button
+              onClick={() => setAuthMode('signup')}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: '600',
+                color: authMode === 'signup' ? '#9333ea' : '#6b7280',
+                borderBottom: authMode === 'signup' ? '2px solid #9333ea' : 'none',
+                marginBottom: '-2px'
+              }}
+            >
+              Sign Up
+            </button>
             <button
               onClick={() => setAuthMode('login')}
               style={{
@@ -157,23 +167,7 @@ function App() {
             >
               Login
             </button>
-            <button
-              onClick={() => setAuthMode('signup')}
-              style={{
-                flex: 1,
-                padding: '12px',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: '600',
-                color: authMode === 'signup' ? '#9333ea' : '#6b7280',
-                borderBottom: authMode === 'signup' ? '2px solid #9333ea' : 'none',
-                marginBottom: '-2px'
-              }}
-            >
-              Sign Up
-            </button>
+          
           </div>
 
           <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
