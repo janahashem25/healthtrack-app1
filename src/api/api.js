@@ -1,207 +1,219 @@
-const API_URL = 'https://healthtrack-backend.onrender.com/api';
+// src/api/api.js
 
-// ===================== Token Management =====================
-function getToken() {
-  try {
-    return localStorage.getItem('token') || '';
-  } catch (error) {
-    console.error('localStorage not available:', error);
-    return '';
-  }
-}
+const API_URL = 'https://healthtrack-backend-t2xk.onrender.com/api';
 
-function setToken(token) {
-  try {
-    localStorage.setItem('token', token);
-  } catch (error) {
-    console.error('Failed to save token:', error);
-  }
-}
+// Get token from localStorage
+const getToken = () => localStorage.getItem('token');
 
-function removeToken() {
-  try {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-  } catch (error) {
-    console.error('Failed to remove token:', error);
-  }
-}
-
-// ===================== Centralized Fetch =====================
-const authFetch = async (url, options = {}) => {
-  try {
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${getToken()}`,
-      ...options.headers,
-    };
-
-    const response = await fetch(`${API_URL}${url}`, { 
-      ...options, 
-      headers 
-    });
-
-    // ✅ Check response status BEFORE parsing JSON
-    if (!response.ok) {
-      let errorMessage = 'Server error';
-      
-      try {
-        const data = await response.json();
-        errorMessage = data.error || data.message || errorMessage;
-      } catch (e) {
-        // Response wasn't JSON, use status text
-        errorMessage = response.statusText || errorMessage;
-      }
-
-      // Handle 401 Unauthorized - token expired
-      if (response.status === 401) {
-        removeToken();
-        window.location.href = '/login'; // Redirect to login
-        return { error: 'Session expired. Please login again.' };
-      }
-
-      return { error: errorMessage };
-    }
-
-    // ✅ Only parse JSON if response is OK
-    const data = await response.json();
-    return data;
-
-  } catch (error) {
-    console.error('Network error:', error);
-    return { error: 'Network error. Please check your connection.' };
-  }
+// Save token and user to localStorage
+const saveAuth = (token, user) => {
+  localStorage.setItem('token', token);
+  localStorage.setItem('user', JSON.stringify(user));
 };
 
-// ===================== Auth APIs =====================
+// Clear auth data
+const clearAuth = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+};
+
+// Get current user from localStorage
+export const getCurrentUser = () => {
+  const userStr = localStorage.getItem('user');
+  return userStr ? JSON.parse(userStr) : null;
+};
+
+// Signup
 export const signup = async (name, email, password) => {
   try {
     const response = await fetch(`${API_URL}/auth/signup`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password }),
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ name, email, password })
     });
-
-    if (!response.ok) {
-      let errorMessage = 'Signup failed';
-      try {
-        const data = await response.json();
-        errorMessage = data.error || errorMessage;
-      } catch (e) {
-        errorMessage = response.statusText;
-      }
-      return { error: errorMessage };
-    }
 
     const data = await response.json();
 
-    if (data.token) {
-      setToken(data.token);
-      try {
-        localStorage.setItem('user', JSON.stringify(data.user));
-      } catch (e) {
-        console.error('Failed to save user data:', e);
-      }
+    if (data.status === 'success') {
+      saveAuth(data.data.token, data.data.user);
+      return { user: data.data.user };
+    } else {
+      return { message: data.message };
     }
-
-    return data;
   } catch (error) {
-    console.error('Signup failed:', error);
-    return { error: 'Network error' };
+    console.error('Signup error:', error);
+    return { message: 'Server error. Please try again.' };
   }
 };
 
+// Login
 export const login = async (email, password) => {
   try {
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
     });
-
-    if (!response.ok) {
-      let errorMessage = 'Login failed';
-      try {
-        const data = await response.json();
-        errorMessage = data.error || errorMessage;
-      } catch (e) {
-        errorMessage = response.statusText;
-      }
-      return { error: errorMessage };
-    }
 
     const data = await response.json();
 
-    if (data.token) {
-      setToken(data.token);
-      try {
-        localStorage.setItem('user', JSON.stringify(data.user));
-      } catch (e) {
-        console.error('Failed to save user data:', e);
-      }
+    if (data.status === 'success') {
+      saveAuth(data.data.token, data.data.user);
+      return { user: data.data.user };
+    } else {
+      return { message: data.message };
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    return { message: 'Server error. Please try again.' };
+  }
+};
+
+// Logout
+export const logout = () => {
+  clearAuth();
+};
+
+// Get Activities
+export const getActivities = async () => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('No token found');
     }
 
-    return data;
+    const response = await fetch(`${API_URL}/activities`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      // Map backend format to frontend format
+      const activities = data.data.activities.map(activity => ({
+        id: activity.id,
+        type: 'exercise', // Default type since backend doesn't have type
+        name: activity.title,
+        duration: '', // Backend doesn't have duration
+        calories: '', // Backend doesn't have calories
+        date: activity.created_at ? new Date(activity.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        description: activity.description,
+        created_at: activity.created_at
+      }));
+
+      return { activities };
+    } else {
+      return { activities: [] };
+    }
   } catch (error) {
-    console.error('Login failed:', error);
-    return { error: 'Network error' };
+    console.error('Get activities error:', error);
+    return { activities: [] };
   }
 };
 
-// ✅ Logout with server notification
-export const logout = async () => {
+// Create Activity
+export const createActivity = async (activityData) => {
   try {
-    // Notify server to invalidate session
-    await authFetch('/auth/logout', { method: 'POST' });
+    const token = getToken();
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    // Map frontend format to backend format
+    const backendData = {
+      title: activityData.name,
+      description: `${activityData.type} - ${activityData.duration ? activityData.duration + ' min - ' : ''}${activityData.calories} cal`
+    };
+
+    const response = await fetch(`${API_URL}/activities`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(backendData)
+    });
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      return { activity: data.data.activity };
+    } else {
+      return { message: data.message };
+    }
   } catch (error) {
-    console.error('Logout request failed:', error);
-  } finally {
-    // Always clear local data
-    removeToken();
+    console.error('Create activity error:', error);
+    return { message: 'Server error. Please try again.' };
   }
 };
 
-export const getCurrentUser = () => {
+// Delete Activity
+export const deleteActivity = async (id) => {
   try {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    const token = getToken();
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    const response = await fetch(`${API_URL}/activities/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      return { success: true };
+    } else {
+      return { message: data.message };
+    }
   } catch (error) {
-    console.error('Failed to get user:', error);
-    return null;
+    console.error('Delete activity error:', error);
+    return { message: 'Server error. Please try again.' };
   }
 };
 
-// ✅ Verify token validity
-export const verifyToken = async () => {
-  const result = await authFetch('/auth/verify');
-  if (result.error) {
-    removeToken();
-    return false;
+// Get Statistics
+export const getStatistics = async () => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    const response = await fetch(`${API_URL}/activities/statistics`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      // Map backend statistics to frontend format
+      const stats = {
+        total_activities: data.data.statistics.total_activities || 0,
+        total_calories: 0, // Backend doesn't track this, would need to calculate
+        total_exercise_time: 0, // Backend doesn't track this, would need to calculate
+        activities_today: data.data.statistics.activities_today || 0,
+        activities_this_week: data.data.statistics.activities_this_week || 0,
+        activities_this_month: data.data.statistics.activities_this_month || 0
+      };
+
+      return { statistics: stats };
+    } else {
+      return { statistics: { total_activities: 0, total_calories: 0, total_exercise_time: 0 } };
+    }
+  } catch (error) {
+    console.error('Get statistics error:', error);
+    return { statistics: { total_activities: 0, total_calories: 0, total_exercise_time: 0 } };
   }
-  return true;
-};
-
-// ===================== Activities APIs =====================
-export const getActivities = () => authFetch('/activities');
-
-export const createActivity = (activity) =>
-  authFetch('/activities', { 
-    method: 'POST', 
-    body: JSON.stringify(activity) 
-  });
-
-export const updateActivity = (id, activity) =>
-  authFetch(`/activities/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(activity)
-  });
-
-export const deleteActivity = (id) =>
-  authFetch(`/activities/${id}`, { method: 'DELETE' });
-
-export const getStatistics = () => authFetch('/activities/stats/summary');
-
-// ✅ Check if user is authenticated
-export const isAuthenticated = () => {
-  return !!getToken();
 };
